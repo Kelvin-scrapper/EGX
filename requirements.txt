@@ -1,0 +1,26 @@
+# EGX Data Pipeline Requirements
+# Dependencies for scrape1.py and best.py
+
+# Core data processing libraries
+pandas>=1.5.0
+numpy>=1.20.0
+
+# PDF processing
+pdfplumber>=0.7.0
+
+# Web scraping and automation
+selenium>=4.0.0
+requests>=2.28.0
+
+# Additional utilities (already included in Python standard library)
+# - os
+# - time
+# - random
+# - re
+# - glob
+# - datetime
+# - typing
+# - subprocess
+# - sys
+# - argparse
+# - urllib.parse
