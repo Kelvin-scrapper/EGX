@@ -30,15 +30,16 @@ except ImportError:
 # ================================
 # CONFIGURATION - MODIFY THESE VALUES
 # ================================
-TARGET_YEAR = "2025"          # Which year to download
-TARGET_MONTH = "July"         # Which month to download
+AUTO_DETECT = True            # Auto-detect most recent year/month from page
+TARGET_YEAR = None            # Set to specific year (e.g., "2025") or None for auto-detect
+TARGET_MONTH = None           # Set to specific month (e.g., "July") or None for auto-detect
 DOWNLOAD_PATH = "downloads"
 HEADLESS_MODE = True          # Set to False to see browser
 MAX_RETRY_ATTEMPTS = 3
 ELEMENT_WAIT_TIMEOUT = 20
 DOWNLOAD_DELAY_MIN = 2
 DOWNLOAD_DELAY_MAX = 4
-BROWSER_CLOSE_WAIT = 45       # Wait 60 seconds before closing browser
+BROWSER_CLOSE_WAIT = 45       # Wait 45 seconds before closing browser
 
 # User agents for anti-detection
 USER_AGENTS = [
@@ -46,6 +47,22 @@ USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 ]
+
+# Month ordering for comparison (supports partial names)
+MONTH_ORDER = {
+    "january": 1, "jan": 1,
+    "february": 2, "feb": 2,
+    "march": 3, "mar": 3,
+    "april": 4, "apr": 4,
+    "may": 5,
+    "june": 6, "jun": 6,
+    "july": 7, "jul": 7,
+    "august": 8, "aug": 8,
+    "september": 9, "sep": 9, "sept": 9,
+    "october": 10, "oct": 10,
+    "november": 11, "nov": 11,
+    "december": 12, "dec": 12
+}
 
 class SimpleEGXDownloader:
     def __init__(self):
@@ -68,7 +85,10 @@ class SimpleEGXDownloader:
         os.makedirs(DOWNLOAD_PATH, exist_ok=True)
         
         print("🎯 Simple EGX File Downloader")
-        print(f"📅 Target: {TARGET_MONTH} {TARGET_YEAR}")
+        if AUTO_DETECT and (TARGET_YEAR is None or TARGET_MONTH is None):
+            print(f"📅 Mode: Auto-detect most recent year/month")
+        else:
+            print(f"📅 Target: {TARGET_MONTH} {TARGET_YEAR}")
         print(f"📁 Download folder: {DOWNLOAD_PATH}")
         print(f"⏰ Browser close wait: {BROWSER_CLOSE_WAIT} seconds")
     
@@ -165,7 +185,178 @@ class SimpleEGXDownloader:
         """Human-like delay"""
         delay = random.uniform(min_sec, max_sec)
         time.sleep(delay)
-    
+
+    def get_month_number(self, month_text):
+        """Extract month number from text (supports partial matches)"""
+        if not month_text:
+            return 0
+
+        # Convert to lowercase and strip
+        month_lower = month_text.lower().strip()
+
+        # Try exact match first
+        if month_lower in MONTH_ORDER:
+            return MONTH_ORDER[month_lower]
+
+        # Try to find month name within the text
+        for month_name, month_num in MONTH_ORDER.items():
+            if month_name in month_lower:
+                return month_num
+
+        return 0
+
+    def detect_most_recent_year(self):
+        """Detect the most recent year available in Weekly Reports section"""
+        print("🔍 Auto-detecting most recent year...")
+
+        try:
+            # Look for year elements within Weekly Reports section
+            # Pattern: onclick="HideShowYears('years_YYYY_9')"
+            year_elements = self.driver.find_elements(
+                By.XPATH,
+                "//div[@id='div_9']//div[contains(@onclick, 'HideShowYears')]"
+            )
+
+            if not year_elements:
+                print("❌ No year elements found")
+                return None
+
+            # Extract year values
+            years = []
+            for element in year_elements:
+                try:
+                    year_text = element.text.strip()
+                    # Try to extract 4-digit year
+                    year_match = re.search(r'\b(20\d{2})\b', year_text)
+                    if year_match:
+                        year = year_match.group(1)
+                        years.append(year)
+                        print(f"   📅 Found year: {year}")
+                except:
+                    continue
+
+            if not years:
+                print("❌ No valid years extracted")
+                return None
+
+            # Sort and get most recent (highest)
+            years.sort(reverse=True)
+            most_recent_year = years[0]
+
+            print(f"✅ Most recent year detected: {most_recent_year}")
+            return most_recent_year
+
+        except Exception as e:
+            print(f"❌ Error detecting year: {e}")
+            return None
+
+    def find_available_months(self, year):
+        """Find all available months for a given year"""
+        print(f"🔍 Scanning available months for year {year}...")
+
+        try:
+            # Make sure year is expanded
+            years_div_id = f"years_{year}_9"
+            if not self.is_expanded(years_div_id):
+                print(f"⚠️ Year {year} not expanded, expanding now...")
+                if not self.find_and_expand_year(year):
+                    return []
+
+            self.human_delay(2, 3)
+
+            # Find month elements within the year's div
+            month_elements = self.driver.find_elements(
+                By.XPATH,
+                f"//div[@id='years_{year}_9']//div[contains(@onclick, 'showHidePDF')]"
+            )
+
+            if not month_elements:
+                print(f"⚠️ No month elements found for year {year}")
+                return []
+
+            # Extract month names and numbers
+            months = []
+            for element in month_elements:
+                try:
+                    if element.is_displayed():
+                        month_text = element.text.strip()
+                        month_num = self.get_month_number(month_text)
+
+                        if month_num > 0:
+                            months.append((month_text, month_num, element))
+                            print(f"   📊 Found month: {month_text} (order: {month_num})")
+                except:
+                    continue
+
+            # Sort by month number (descending - most recent first)
+            months.sort(key=lambda x: x[1], reverse=True)
+
+            print(f"✅ Found {len(months)} months for year {year}")
+            return months
+
+        except Exception as e:
+            print(f"❌ Error finding months: {e}")
+            return []
+
+    def detect_most_recent_month(self, year):
+        """Detect most recent month with PDFs for a given year"""
+        print(f"🔍 Auto-detecting most recent month for year {year}...")
+
+        months = self.find_available_months(year)
+
+        if not months:
+            print(f"❌ No months found for year {year}")
+            return None, None
+
+        # Try each month starting from most recent
+        for month_text, month_num, month_element in months:
+            print(f"🔄 Checking month: {month_text}...")
+
+            try:
+                # Extract PDF div ID from onclick
+                onclick = month_element.get_attribute('onclick') or ''
+                match = re.search(r"showHidePDF\('([^']+)'\)", onclick)
+
+                if not match:
+                    print(f"   ⚠️ Could not extract PDF div ID")
+                    continue
+
+                pdf_div_id = match.group(1)
+
+                # Expand the month if not already expanded
+                if not self.is_month_expanded(pdf_div_id):
+                    print(f"   🔄 Expanding month {month_text}...")
+                    if not self.enhanced_click(month_element, f"month {month_text}"):
+                        print(f"   ❌ Failed to expand month {month_text}")
+                        continue
+
+                    # Wait for expansion
+                    self.human_delay(2, 3)
+
+                # Check if month has PDF files
+                if self.is_month_expanded(pdf_div_id):
+                    pdf_div = self.driver.find_element(By.ID, pdf_div_id)
+                    pdf_links = pdf_div.find_elements(
+                        By.XPATH,
+                        ".//a[contains(@href, 'get_pdf.aspx') or contains(@href, '.pdf')]"
+                    )
+
+                    if len(pdf_links) > 0:
+                        print(f"✅ Month {month_text} has {len(pdf_links)} PDF files")
+                        print(f"✅ Most recent month detected: {month_text}")
+                        return month_text, pdf_div_id
+                    else:
+                        print(f"   ⚠️ Month {month_text} has no PDF files, trying previous month...")
+                else:
+                    print(f"   ⚠️ Month {month_text} did not expand properly")
+
+            except Exception as e:
+                print(f"   ❌ Error checking month {month_text}: {e}")
+                continue
+
+        print(f"❌ No months with PDF files found for year {year}")
+        return None, None
+
     def setup_driver(self):
         """Setup Chrome driver for downloads"""
         if not SELENIUM_AVAILABLE:
@@ -710,15 +901,49 @@ class SimpleEGXDownloader:
             # Find weekly reports
             if not self.find_weekly_reports_section():
                 return False
-            
+
+            # Determine year and month to download
+            target_year = None
+            target_month = None
+            pdf_div_id = None
+
+            # Auto-detect or use manual configuration
+            if AUTO_DETECT and TARGET_YEAR is None:
+                # Auto-detect year
+                target_year = self.detect_most_recent_year()
+                if not target_year:
+                    print("❌ Failed to auto-detect year")
+                    return False
+            else:
+                # Use manual configuration
+                target_year = TARGET_YEAR
+                print(f"📅 Using manual year: {target_year}")
+
             # Expand target year
-            if not self.find_and_expand_year(TARGET_YEAR):
+            if not self.find_and_expand_year(target_year):
                 return False
-            
-            # Expand target month
-            success, pdf_div_id = self.find_and_expand_month(TARGET_MONTH)
-            if not success:
-                return False
+
+            # Determine month
+            if AUTO_DETECT and TARGET_MONTH is None:
+                # Auto-detect month (with fallback to previous months)
+                target_month, pdf_div_id = self.detect_most_recent_month(target_year)
+
+                if not target_month or not pdf_div_id:
+                    print("❌ Failed to auto-detect month with PDFs")
+                    return False
+            else:
+                # Use manual configuration
+                target_month = TARGET_MONTH
+                print(f"📅 Using manual month: {target_month}")
+
+                # Expand target month
+                success, pdf_div_id = self.find_and_expand_month(target_month)
+                if not success:
+                    return False
+
+            # Print final target
+            print(f"\n🎯 Final target: {target_month} {target_year}")
+            print(f"📦 PDF container ID: {pdf_div_id}")
             
             # Download files
             downloaded = self.download_files_from_month(pdf_div_id)
