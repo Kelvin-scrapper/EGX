@@ -199,7 +199,7 @@ def create_csv_with_headers(csv_path: str) -> bool:
                     header_2_quoted.append(f'"{item}"')
             f.write(','.join(header_2_quoted) + '\n')
         
-        print(f"✓ Created CSV: {csv_path}")
+        print(f"[OK] Created CSV: {csv_path}")
         return True
         
     except Exception as e:
@@ -250,14 +250,14 @@ def clean_number(value_str):
 def extract_retail_data_from_text(page_text: str) -> Dict[str, float]:
     """Extract retail trading data from the Trading by Categories section."""
     
-    print("🛒 Extracting retail data...")
+    print("[RETAIL] Extracting retail data...")
     
     # Find the "Trading by Categories of Investors" section
     section_pattern = r'Trading by Categories of Investors in EGP Million.*?(?=(?:Bonds|OTC|Listed Stocks incl\.|$))'
     section_match = re.search(section_pattern, page_text, re.DOTALL | re.IGNORECASE)
     
     if not section_match:
-        print("❌ Trading by Categories section not found")
+        print("[ERROR] Trading by Categories section not found")
         return {}
     
     section_text = section_match.group(0)
@@ -267,11 +267,11 @@ def extract_retail_data_from_text(page_text: str) -> Dict[str, float]:
     listed_stocks_match = re.search(listed_stocks_pattern, section_text, re.DOTALL | re.IGNORECASE)
     
     if not listed_stocks_match:
-        print("❌ Listed Stocks including Deals section not found")
+        print("[ERROR] Listed Stocks including Deals section not found")
         return {}
     
     table_text = listed_stocks_match.group(0)
-    print(f"📋 Table text preview: {table_text[:300]}...")
+    print(f"[TABLE] Table text preview: {table_text[:300]}...")
     
     retail_data = {}
     
@@ -280,9 +280,9 @@ def extract_retail_data_from_text(page_text: str) -> Dict[str, float]:
     header_match = re.search(header_pattern, table_text, re.IGNORECASE)
     
     if header_match:
-        print("✅ Found correct table header with Institutions and Retail columns")
+        print("[OK] Found correct table header with Institutions and Retail columns")
     else:
-        print("⚠ Table header not found, trying alternative extraction")
+        print("[WARNING] Table header not found, trying alternative extraction")
     
     # Split the text into lines and process line by line for better accuracy
     lines = table_text.split('\n')
@@ -299,7 +299,7 @@ def extract_retail_data_from_text(page_text: str) -> Dict[str, float]:
             
             # Look for lines that start with the nationality name
             if line_lower.startswith(nationality_lower) or (nationality == 'EGYPTIANS' and line_lower.startswith('egyptians')):
-                print(f"🔍 Processing line for {nationality}: {line}")
+                print(f"[SEARCH] Processing line for {nationality}: {line}")
                 
                 # Extract all numbers from this line
                 # Pattern to match numbers including negatives in parentheses
@@ -307,7 +307,7 @@ def extract_retail_data_from_text(page_text: str) -> Dict[str, float]:
                 numbers = re.findall(number_pattern, line)
                 
                 if len(numbers) >= 8:
-                    print(f"📊 Found {len(numbers)} numbers: {numbers}")
+                    print(f"[DATA] Found {len(numbers)} numbers: {numbers}")
                     
                     # Convert to clean numbers
                     clean_numbers = [clean_number(num) for num in numbers]
@@ -323,11 +323,11 @@ def extract_retail_data_from_text(page_text: str) -> Dict[str, float]:
                         retail_data[f"EGXEDW.RETAIL.{nationality}.SELL.W"] = retail_sell
                         retail_data[f"EGXEDW.RETAIL.{nationality}.NETBUY.W"] = retail_netbuy
                         
-                        print(f"✅ {nationality}: Buy={retail_buy}, Sell={retail_sell}, NetBuy={retail_netbuy}")
+                        print(f"[OK] {nationality}: Buy={retail_buy}, Sell={retail_sell}, NetBuy={retail_netbuy}")
                     else:
-                        print(f"❌ Insufficient numbers found for {nationality}: {len(clean_numbers)}")
+                        print(f"[ERROR] Insufficient numbers found for {nationality}: {len(clean_numbers)}")
                 else:
-                    print(f"❌ Not enough numbers in line for {nationality}: found {len(numbers)}")
+                    print(f"[ERROR] Not enough numbers in line for {nationality}: found {len(numbers)}")
     
     # Fill missing data with 0.0
     for nationality in ['EGYPTIANS', 'ARABS', 'FOREIGNERS', 'TOTAL']:
@@ -341,14 +341,14 @@ def extract_retail_data_from_text(page_text: str) -> Dict[str, float]:
 def extract_retail_data_from_table(tables: List[List]) -> Dict[str, float]:
     """Extract retail data from table structure as fallback."""
     
-    print("🛒 Extracting retail data from tables...")
+    print("[RETAIL] Extracting retail data from tables...")
     retail_data = {}
     
     for table_idx, table in enumerate(tables):
         if not table or len(table) < 3:
             continue
         
-        print(f"📋 Analyzing table {table_idx + 1} with {len(table)} rows")
+        print(f"[TABLE] Analyzing table {table_idx + 1} with {len(table)} rows")
         
         # Look for the "Trading by Categories" table by checking headers
         header_found = False
@@ -362,13 +362,13 @@ def extract_retail_data_from_table(tables: List[List]) -> Dict[str, float]:
             if any(keyword in row_text.lower() for keyword in ['categories', 'nationalities', 'retail', 'institutions']):
                 header_found = True
                 header_row_idx = row_idx
-                print(f"✅ Found potential header at row {row_idx}: {row_text}")
+                print(f"[OK] Found potential header at row {row_idx}: {row_text}")
                 break
         
         if not header_found:
             continue
         
-        print(f"📊 Processing table with header at row {header_row_idx}")
+        print(f"[DATA] Processing table with header at row {header_row_idx}")
         
         # Look for nationality data rows
         for row_idx, row in enumerate(table):
@@ -389,28 +389,28 @@ def extract_retail_data_from_table(tables: List[List]) -> Dict[str, float]:
                 nationality = 'TOTAL'
             
             if nationality:
-                print(f"🔍 Processing table row for {nationality}: {first_cell}")
+                print(f"[SEARCH] Processing table row for {nationality}: {first_cell}")
                 
                 # Extract numbers from the row
                 numbers = []
                 for cell_idx, cell in enumerate(row[1:], 1):  # Skip first cell (nationality name)
                     if cell is None or str(cell).strip() == "":
-                        numbers.append(0.0)
+                        numbers.append(None)  # Mark empty cells as None
                         continue
-                    
+
                     cell_str = str(cell).strip()
-                    
+
                     # Handle negative values in parentheses
                     if cell_str.startswith('(') and cell_str.endswith(')'):
                         cell_str = '-' + cell_str[1:-1]
-                    
+
                     try:
                         value = float(re.sub(r'[,\s]', '', cell_str))
                         numbers.append(value)
                     except:
-                        numbers.append(0.0)
+                        numbers.append(None)  # Mark unparseable cells as None
                 
-                print(f"📊 Extracted {len(numbers)} values: {numbers[:8]}")
+                print(f"[DATA] Extracted {len(numbers)} values: {numbers[:8]}")
                 
                 # The table structure should be:
                 # [inst_buy, inst_sell, inst_buy+sell, inst_netbuy, retail_buy, retail_sell, retail_buy+sell, retail_netbuy]
@@ -425,11 +425,11 @@ def extract_retail_data_from_table(tables: List[List]) -> Dict[str, float]:
                         retail_data[f"EGXEDW.RETAIL.{nationality}.SELL.W"] = retail_sell
                         retail_data[f"EGXEDW.RETAIL.{nationality}.NETBUY.W"] = retail_netbuy
                         
-                        print(f"✅ Table: {nationality}: Buy={retail_buy}, Sell={retail_sell}, NetBuy={retail_netbuy}")
+                        print(f"[OK] Table: {nationality}: Buy={retail_buy}, Sell={retail_sell}, NetBuy={retail_netbuy}")
                     else:
-                        print(f"⚠ Suspicious values for {nationality}, might be wrong columns")
+                        print(f"[WARNING] Suspicious values for {nationality}, might be wrong columns")
                 else:
-                    print(f"❌ Insufficient columns for {nationality}: found {len(numbers)}")
+                    print(f"[ERROR] Insufficient columns for {nationality}: found {len(numbers)}")
         
         # If we found retail data in this table, we're done
         if retail_data:
@@ -443,7 +443,7 @@ def extract_retail_data_from_table(tables: List[List]) -> Dict[str, float]:
                 retail_data[key] = 0.0
     
     extracted_count = sum(1 for v in retail_data.values() if v != 0.0)
-    print(f"📊 Table extraction: {extracted_count}/12 retail data points")
+    print(f"[DATA] Table extraction: {extracted_count}/12 retail data points")
     
     return retail_data
 
@@ -494,7 +494,7 @@ def extract_institutional_data_complete(pdf_path: str) -> Optional[Tuple[str, Di
 
                     # Use text extraction only as a fallback if table extraction fails completely.
                     if not retail_data or all(v == 0.0 for v in retail_data.values()):
-                        print("⚠ Table extraction failed, using text-based fallback for retail data.")
+                        print("[WARNING] Table extraction failed, using text-based fallback for retail data.")
                         retail_data = extract_retail_data_from_text(page_text)
                 
                 if period_info and institutional_data and retail_data:
@@ -513,7 +513,7 @@ def extract_institutional_data_complete(pdf_path: str) -> Optional[Tuple[str, Di
             
             # Count extracted retail values
             retail_count = sum(1 for k, v in retail_data.items() if k.startswith('EGXEDW.RETAIL.') and v != 0.0)
-            print(f"📊 Extracted {retail_count} retail data points")
+            print(f"[DATA] Extracted {retail_count} retail data points")
             
             return period_info, combined_data
             
@@ -527,9 +527,9 @@ def parse_complete_institutional_table(table: List[List]) -> Optional[Dict[str, 
         return None
     
     print(f"Parsing institutional table with {len(table)} rows")
-    
-    # Initialize all data to 0
-    data = {col: 0.0 for col in HEADER_1 if col.startswith('EGXEDW.') and not col.startswith('EGXEDW.RETAIL.')}
+
+    # Initialize empty data dictionary (no pre-filling with zeros)
+    data = {}
     
     # Parse each row of the institutional table
     for row_idx, row in enumerate(table):
@@ -564,20 +564,20 @@ def parse_complete_institutional_table(table: List[List]) -> Optional[Dict[str, 
         numbers = []
         for cell in row[1:]:
             if cell is None or str(cell).strip() == "":
-                numbers.append(0.0)
+                numbers.append(None)  # Mark empty cells as None
                 continue
-            
+
             cell_str = str(cell).strip()
-            
+
             # Handle negative values in parentheses
             if cell_str.startswith('(') and cell_str.endswith(')'):
                 cell_str = '-' + cell_str[1:-1]
-            
+
             try:
                 value = float(re.sub(r'[,\s]', '', cell_str))
                 numbers.append(value)
             except:
-                numbers.append(0.0)
+                numbers.append(None)  # Mark unparseable cells as None
         
         print(f"  Extracted {len(numbers)} values: {numbers[:9]}")  # Show first 9
         
@@ -592,7 +592,8 @@ def parse_complete_institutional_table(table: List[List]) -> Optional[Dict[str, 
                 for action in actions:
                     if idx < len(numbers):
                         col_name = f"EGXEDW.{nat}.{institution}.{action}.W"
-                        if col_name in data:
+                        # Only add to dictionary if value is not None (empty cell)
+                        if numbers[idx] is not None:
                             data[col_name] = numbers[idx]
                             if numbers[idx] != 0:
                                 print(f"    {col_name} = {numbers[idx]}")
@@ -681,22 +682,22 @@ def append_data_to_csv(csv_path: str, period: str, data: Dict[str, float]) -> bo
     try:
         # Create the complete row
         row_data = [period]  # Start with period
-        
+
         # Add all EGX columns in order
         for col in HEADER_1[1:]:  # Skip empty first column
-            value = data.get(col, 0.0)
-            # Convert 0.0 to "NA" for missing data to match original format
-            if value == 0.0:
-                row_data.append("NA")
+            if col in data:
+                # Column was extracted from PDF - write the value (even if 0.0)
+                row_data.append(str(data[col]))
             else:
-                row_data.append(str(value))
-        
+                # Column was not extracted - mark as NA
+                row_data.append("NA")
+
         # Append to CSV file
         with open(csv_path, 'a', newline='', encoding='utf-8') as f:
             f.write(','.join(row_data) + '\n')
-        
+
         return True
-        
+
     except Exception as e:
         print(f"Error appending to CSV: {e}")
         return False
@@ -708,7 +709,7 @@ def process_pdf_file(csv_path: str, pdf_path: str) -> bool:
         
         result = extract_institutional_data_complete(pdf_path)
         if not result:
-            print("❌ Failed to extract data")
+            print("[ERROR] Failed to extract data")
             return False
         
         period, data = result
@@ -718,14 +719,14 @@ def process_pdf_file(csv_path: str, pdf_path: str) -> bool:
             with open(csv_path, 'r', encoding='utf-8') as f:
                 content = f.read()
                 if period in content:
-                    print(f"⚠ Period {period} already exists. Skipping.")
+                    print(f"[WARNING] Period {period} already exists. Skipping.")
                     return True
         
         # Append to CSV
         if append_data_to_csv(csv_path, period, data):
             non_zero_count = sum(1 for v in data.values() if v != 0)
             retail_count = sum(1 for k, v in data.items() if k.startswith('EGXEDW.RETAIL.') and v != 0)
-            print(f"✓ Added period {period} with {non_zero_count} total values ({retail_count} retail)")
+            print(f"[OK] Added period {period} with {non_zero_count} total values ({retail_count} retail)")
             return True
         else:
             return False
@@ -759,7 +760,7 @@ def process_all_pdfs() -> bool:
         if process_pdf_file(csv_file, pdf_path):
             success_count += 1
     
-    print(f"\n🎯 Final: {success_count}/{len(pdf_files)} files processed successfully")
+    print(f"\n[FINAL] Final: {success_count}/{len(pdf_files)} files processed successfully")
     
     if success_count > 0:
         # Show CSV summary with retail data analysis
@@ -774,7 +775,7 @@ def process_all_pdfs() -> bool:
                 # Analyze retail data coverage
                 retail_cols = [col for col in df.columns if 'RETAIL' in col]
                 if retail_cols:
-                    print(f"\n📊 RETAIL DATA ANALYSIS:")
+                    print(f"\n[DATA] RETAIL DATA ANALYSIS:")
                     print(f"Total retail columns: {len(retail_cols)}")
                     
                     for col in retail_cols[:6]:  # Show first 6 retail columns
@@ -795,13 +796,13 @@ if __name__ == "__main__":
     print("EGX INSTITUTIONAL + RETAIL DATA PROCESSOR")
     print("=" * 50)
     print(f"Downloads folder: {get_local_downloads_folder()}")
-    print("🆕 NEW: Now extracting retail data (12 additional columns)")
+    print("[NEW] Now extracting retail data (12 additional columns)")
     print("=" * 50)
     
     success = process_all_pdfs()
     
     if success:
-        print("\n🎉 SUCCESS: Data extracted and saved to EGX_Weekly_Data.csv")
-        print("✅ All 75 columns including retail data should now be captured!")
+        print("\n[SUCCESS] SUCCESS: Data extracted and saved to EGX_Weekly_Data.csv")
+        print("[OK] All 75 columns including retail data should now be captured!")
     else:
-        print("\n❌ FAILED: Could not process files")
+        print("\n[ERROR] FAILED: Could not process files")
