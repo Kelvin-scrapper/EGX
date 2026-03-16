@@ -39,7 +39,7 @@ MAX_RETRY_ATTEMPTS = 3
 ELEMENT_WAIT_TIMEOUT = 20
 DOWNLOAD_DELAY_MIN = 2
 DOWNLOAD_DELAY_MAX = 4
-BROWSER_CLOSE_WAIT = 45       # Wait 45 seconds before closing browser
+BROWSER_CLOSE_WAIT = 20       # Wait 20 seconds before closing browser
 
 # User agents for anti-detection
 USER_AGENTS = [

@@ -167,9 +167,9 @@ HEADER_2 = [
 ]
 
 def get_local_downloads_folder() -> str:
-    """Get Downloads folder in same directory as script"""
+    """Get downloads folder in same directory as script"""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    downloads_path = os.path.join(script_dir, "Downloads")
+    downloads_path = os.path.join(script_dir, "downloads")
     return downloads_path
 
 def find_pdf_files_in_downloads() -> List[str]:
@@ -737,7 +737,9 @@ def process_pdf_file(csv_path: str, pdf_path: str) -> bool:
 
 def process_all_pdfs() -> bool:
     """Process all PDF files in Downloads folder"""
-    csv_file = "EGX_Weekly_Data.csv"
+    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
+    os.makedirs(output_dir, exist_ok=True)
+    csv_file = os.path.join(output_dir, "EGX_Weekly_Data.csv")
     
     # Find PDF files
     pdf_files = find_pdf_files_in_downloads()

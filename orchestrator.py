@@ -20,11 +20,13 @@ class EGXPipelineOrchestrator:
         self.script_dir = os.path.dirname(os.path.abspath(__file__))
         self.scraper_script = os.path.join(self.script_dir, "scrape1.py")
         self.processor_script = os.path.join(self.script_dir, "best.py")
-        self.downloads_dir = os.path.join(self.script_dir, "Downloads")
-        
+        self.downloads_dir = os.path.join(self.script_dir, "downloads")
+        self.output_dir = os.path.join(self.script_dir, "output")
+
         print("EGX Data Pipeline Orchestrator")
         print(f"Working directory: {self.script_dir}")
         print(f"Downloads directory: {self.downloads_dir}")
+        print(f"Output directory: {self.output_dir}")
     
     def check_dependencies(self):
         """Check if required scripts exist"""
@@ -130,7 +132,7 @@ class EGXPipelineOrchestrator:
             print("EGX Data Pipeline completed successfully!")
             
             # Check for output CSV
-            csv_file = os.path.join(self.script_dir, "EGX_Weekly_Data.csv")
+            csv_file = os.path.join(self.output_dir, "EGX_Weekly_Data.csv")
             if os.path.exists(csv_file):
                 print(f"Output CSV: {csv_file}")
                 try:
@@ -159,7 +161,7 @@ class EGXPipelineOrchestrator:
         print(f"   scrape1.py: {'Found' if os.path.exists(self.scraper_script) else 'Missing'}")
         print(f"   best.py: {'Found' if os.path.exists(self.processor_script) else 'Missing'}")
         
-        # Check downloads
+        # Check downloads folder
         print("\nDownloads:")
         if os.path.exists(self.downloads_dir):
             pdf_files = [f for f in os.listdir(self.downloads_dir) if f.endswith('.pdf')]
@@ -167,11 +169,11 @@ class EGXPipelineOrchestrator:
             if pdf_files:
                 print(f"   Latest: {max(pdf_files, key=lambda f: os.path.getmtime(os.path.join(self.downloads_dir, f)))}")
         else:
-            print("   Downloads directory: Not found")
+            print("   Output directory: Not found")
         
         # Check output
         print("\nOutput:")
-        csv_file = os.path.join(self.script_dir, "EGX_Weekly_Data.csv")
+        csv_file = os.path.join(self.output_dir, "EGX_Weekly_Data.csv")
         if os.path.exists(csv_file):
             try:
                 file_size = os.path.getsize(csv_file)
